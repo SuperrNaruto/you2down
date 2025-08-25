@@ -1,0 +1,33 @@
+services:
+  youtube-downloader:
+    build: .
+    container_name: you2down
+    restart: unless-stopped
+    environment:
+      - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
+      - BOT_TOKEN=${BOT_TOKEN}
+      - CHAT_ID=${CHAT_ID}
+      - ALIST_SERVER=${ALIST_SERVER}
+      - ALIST_USERNAME=${ALIST_USERNAME}
+      - ALIST_PASSWORD=${ALIST_PASSWORD}
+      - PLAYLISTS=${PLAYLISTS}
+      - CHECK_INTERVAL=${CHECK_INTERVAL:-1800}
+      - MAX_CONCURRENT_DOWNLOADS=${MAX_CONCURRENT_DOWNLOADS:-3}
+      - DOWNLOAD_PATH=${DOWNLOAD_PATH:-/app/downloads}
+      - ALIST_PATH=${ALIST_PATH:-/videos}
+      - VIDEO_QUALITY=${VIDEO_QUALITY:-best}
+      - DATABASE_PATH=${DATABASE_PATH:-/app/data/app.db}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FILE=${LOG_FILE:-/app/logs/app.log}
+    volumes:
+      - ./downloads:/app/downloads
+      - ./data:/app/data
+      - ./logs:/app/logs
+    ports:
+      - "8110:8080"  # 可选：健康检查端点
+    networks:
+      - you2down-network
+
+networks:
+  you2down-network:
+    driver: bridge
