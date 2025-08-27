@@ -14,6 +14,7 @@ from telegram_bot import TelegramNotifier
 from downloader import VideoDownloader
 from uploader import VideoUploader
 from scheduler import TaskScheduler
+from handlers.gdrive_handler import GoogleDriveHandler
 
 
 class YouTubeDownloadSystem:
@@ -29,6 +30,7 @@ class YouTubeDownloadSystem:
         self.downloader: VideoDownloader = None
         self.uploader: VideoUploader = None
         self.scheduler: TaskScheduler = None
+        self.gdrive_handler: GoogleDriveHandler = None
         self._shutdown_event = asyncio.Event()
     
     async def initialize(self) -> bool:
@@ -51,6 +53,10 @@ class YouTubeDownloadSystem:
             self.db = Database(self.config.database_path)
             await self.db.init()
             logging.info("数据库初始化完成")
+            
+            # 同步播放列表策略配置
+            await self._sync_playlist_strategies()
+            logging.info("播放列表策略同步完成")
             
             # 初始化YouTube客户端
             self.youtube = YouTubeClient(self.config.youtube_api_key)
@@ -98,6 +104,15 @@ class YouTubeDownloadSystem:
             )
             logging.info("上传管理器初始化完成")
             
+            # 初始化Google Drive处理器
+            self.gdrive_handler = GoogleDriveHandler(
+                self.config,
+                self.db,
+                self.alist,
+                self.telegram
+            )
+            logging.info("Google Drive处理器初始化完成")
+            
             # 初始化调度器
             self.scheduler = TaskScheduler(
                 self.config,
@@ -105,7 +120,8 @@ class YouTubeDownloadSystem:
                 self.youtube,
                 self.downloader,
                 self.uploader,
-                self.telegram
+                self.telegram,
+                self.gdrive_handler
             )
             logging.info("任务调度器初始化完成")
             
@@ -128,6 +144,32 @@ class YouTubeDownloadSystem:
         except Exception as e:
             logging.error(f"系统初始化失败: {e}")
             return False
+    
+    async def _sync_playlist_strategies(self) -> None:
+        """同步播放列表策略配置到数据库."""
+        try:
+            # 获取环境变量中的策略配置
+            env_strategies = self.config.get_playlist_strategies()
+            
+            # 获取数据库中的当前策略
+            db_strategies = await self.db.get_all_playlist_strategies()
+            
+            # 检查是否需要同步
+            needs_sync = False
+            for playlist_id, env_strategy in env_strategies.items():
+                db_strategy = db_strategies.get(playlist_id)
+                if db_strategy != env_strategy:
+                    needs_sync = True
+                    logging.info(f"检测到播放列表策略差异 {playlist_id}: DB({db_strategy}) → ENV({env_strategy})")
+                    await self.db.set_playlist_strategy(playlist_id, env_strategy)
+            
+            if needs_sync:
+                logging.info("播放列表策略已同步到数据库")
+            else:
+                logging.debug("播放列表策略已是最新，无需同步")
+                
+        except Exception as e:
+            logging.error(f"同步播放列表策略失败: {e}")
     
     def _setup_logging(self) -> None:
         """配置日志."""
@@ -203,6 +245,10 @@ class YouTubeDownloadSystem:
             if self.telegram:
                 await self.telegram.notify_shutdown()
                 await self.telegram.stop()
+            
+            # 关闭处理器
+            if self.gdrive_handler:
+                await self.gdrive_handler.close()
             
             # 关闭客户端连接
             if self.youtube:

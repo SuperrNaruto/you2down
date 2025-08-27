@@ -39,7 +39,7 @@ class AlistClient:
     async def _get_session(self) -> aiohttp.ClientSession:
         """获取HTTP会话."""
         if self.session is None or self.session.closed:
-            timeout = aiohttp.ClientTimeout(total=300)  # 5分钟超时
+            timeout = aiohttp.ClientTimeout(total=900)  # 15分钟超时，适合大文件上传
             # 添加标准headers提高兼容性
             headers = {
                 'User-Agent': 'Mozilla/5.0 (compatible; AlistClient/1.0)',

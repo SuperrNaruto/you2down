@@ -19,7 +19,14 @@ class TelegramNotifier:
         self.chat_id = chat_id
         self.bot = Bot(token=bot_token)
         self.dp = Dispatcher()
+        
+        # 初始化所有回调函数
         self.retry_callback: Optional[Callable[[str], None]] = None
+        self.status_callback: Optional[Callable[[], str]] = None
+        self.stats_callback: Optional[Callable[[], str]] = None
+        self.strategies_callback: Optional[Callable[[], str]] = None
+        self.set_strategy_callback: Optional[Callable[[str, str], bool]] = None
+        
         # 跟踪每个视频的消息ID，用于消息删除功能
         self.video_messages: Dict[str, List[int]] = {}
         self._setup_handlers()
@@ -34,7 +41,9 @@ class TelegramNotifier:
                 "🎬 YouTube下载系统已启动\n"
                 "📋 可用命令:\n"
                 "/status - 查看系统状态\n"
-                "/stats - 查看统计信息"
+                "/stats - 查看统计信息\n"
+                "/strategies - 查看播放列表下载策略\n"
+                "/set_strategy - 设置播放列表下载策略"
             )
         
         @self.dp.message(Command("status"))
@@ -54,6 +63,66 @@ class TelegramNotifier:
                 await message.answer(stats_info)
             else:
                 await message.answer("❌ 统计功能未启用")
+        
+        @self.dp.message(Command("strategies"))
+        async def strategies_handler(message: Message) -> None:
+            """处理/strategies命令."""
+            if self.strategies_callback:
+                strategies_info = await self.strategies_callback()
+                await message.answer(strategies_info)
+            else:
+                await message.answer("❌ 策略查询功能未启用")
+        
+        @self.dp.message(Command("set_strategy"))
+        async def set_strategy_handler(message: Message) -> None:
+            """处理/set_strategy命令."""
+            try:
+                # 解析命令参数 /set_strategy playlist_id strategy
+                args = message.text.split()
+                if len(args) != 3:
+                    await message.answer(
+                        "❌ 命令格式错误\n"
+                        "正确格式: /set_strategy <playlist_id> <strategy>\n\n"
+                        "策略选项:\n"
+                        "• both - 下载视频和Drive文件\n"
+                        "• video_only - 仅下载视频\n"
+                        "• gdrive_only - 仅下载Drive文件\n\n"
+                        "示例: /set_strategy PLxxx123 video_only"
+                    )
+                    return
+                
+                playlist_id = args[1]
+                strategy = args[2]
+                
+                # 验证策略
+                valid_strategies = ['both', 'video_only', 'gdrive_only']
+                if strategy not in valid_strategies:
+                    await message.answer(
+                        f"❌ 无效的策略: {strategy}\n"
+                        f"有效选项: {', '.join(valid_strategies)}"
+                    )
+                    return
+                
+                # 调用回调函数设置策略
+                if self.set_strategy_callback:
+                    result = await self.set_strategy_callback(playlist_id, strategy)
+                    if result:
+                        strategy_desc = {
+                            'both': '视频+Drive文件',
+                            'video_only': '仅视频',
+                            'gdrive_only': '仅Drive文件'
+                        }
+                        await message.answer(
+                            f"✅ 播放列表策略已更新\n"
+                            f"📂 ID: {playlist_id}\n"
+                            f"📥 策略: {strategy_desc[strategy]}"
+                        )
+                    else:
+                        await message.answer("❌ 设置策略失败，请检查播放列表ID")
+                else:
+                    await message.answer("❌ 策略设置功能未启用")
+            except Exception as e:
+                await message.answer(f"❌ 设置策略时出错: {str(e)}")
         
         @self.dp.callback_query(F.data.startswith("retry_"))
         async def retry_handler(callback_query: CallbackQuery) -> None:
@@ -83,16 +152,42 @@ class TelegramNotifier:
     def set_stats_callback(self, callback: Callable[[], str]) -> None:
         """设置统计信息回调函数."""
         self.stats_callback = callback
+
+    
+    def set_strategies_callback(self, callback):
+        """设置策略查询回调函数."""
+        self.strategies_callback = callback
+    
+    def set_set_strategy_callback(self, callback):
+        """设置策略设置回调函数."""
+        self.set_strategy_callback = callback
     
     async def start(self) -> None:
-        """启动Bot（如果需要接收命令）."""
-        # 注意：在这个简化版本中，我们主要用于发送通知
-        # 如果需要完整的bot功能，需要在单独的任务中运行polling
-        pass
+        """启动Bot polling以接收用户命令."""
+        try:
+            # 启动Bot polling以接收用户命令
+            import asyncio
+            self._polling_task = asyncio.create_task(self.dp.start_polling(self.bot))
+            print("Telegram Bot polling 已启动，可以接收命令")
+        except Exception as e:
+            print(f"启动Telegram Bot polling失败: {e}")
+            raise
     
     async def stop(self) -> None:
         """停止Bot."""
-        await self.bot.session.close()
+        try:
+            # 停止polling任务
+            if hasattr(self, '_polling_task') and self._polling_task:
+                self._polling_task.cancel()
+                try:
+                    await self._polling_task
+                except asyncio.CancelledError:
+                    pass
+            print("Telegram Bot polling 已停止")
+        except Exception as e:
+            print(f"停止Telegram Bot polling时出错: {e}")
+        finally:
+            await self.bot.session.close()
     
     async def send_message(
         self, 
@@ -267,6 +362,20 @@ class TelegramNotifier:
             "🔄 开始下载任务..."
         )
         await self.send_message(text)
+
+    
+    async def notify_playlist_check_with_strategy(self, playlist_id: str, playlist_name: str, video_count: int, strategy_desc: str) -> None:
+        """通知播放列表检查结果（带策略信息）."""
+        try:
+            message = f"📋 播放列表检查完成\n\n"
+            message += f"📂 列表: {playlist_name}\n"
+            message += f"🆔 ID: {playlist_id}\n"
+            message += f"🔢 新视频: {video_count} 个\n"
+            message += f"📥 策略: {strategy_desc}"
+            
+            await self.send_message(message)
+        except Exception as e:
+            print(f"发送播放列表检查通知失败: {e}")
     
     async def notify_error(self, error_type: str, error_message: str) -> None:
         """通知系统错误."""
@@ -289,6 +398,56 @@ class TelegramNotifier:
             f"🔄 处理中: {stats.get('processing', 0)}"
         )
         await self.send_message(text)
+
+    
+    async def notify_gdrive_download_success(self, video_id: str, filename: str, file_size: int) -> None:
+        """通知Google Drive文件下载成功."""
+        try:
+            size_str = self._format_file_size(file_size)
+            message = f"📱✅ Google Drive文件下载成功\n\n"
+            message += f"📄 文件名: {filename}\n"
+            message += f"📊 大小: {size_str}\n"
+            message += f"🎬 关联视频: {video_id}"
+            
+            await self.send_message(message)
+        except Exception as e:
+            print(f"发送Google Drive下载成功通知失败: {e}")
+    
+    async def notify_gdrive_download_failed(self, video_id: str, filename: str, error: str) -> None:
+        """通知Google Drive文件下载失败."""
+        try:
+            message = f"📱❌ Google Drive文件下载失败\n\n"
+            message += f"📄 文件名: {filename}\n"
+            message += f"🎬 关联视频: {video_id}\n"
+            message += f"❌ 错误: {error}"
+            
+            await self.send_message(message)
+        except Exception as e:
+            print(f"发送Google Drive下载失败通知失败: {e}")
+    
+    async def notify_gdrive_links_detected(self, video_title: str, video_id: str, link_count: int) -> None:
+        """通知检测到Google Drive链接."""
+        try:
+            message = f"🔗 检测到Google Drive链接\n\n"
+            message += f"🎬 视频: {video_title}\n"
+            message += f"📱 检测到 {link_count} 个Google Drive文件\n"
+            message += f"⏳ 将自动开始下载..."
+            
+            await self.send_message(message)
+        except Exception as e:
+            print(f"发送Google Drive链接检测通知失败: {e}")
+    
+    def _format_file_size(self, size_bytes: int) -> str:
+        """格式化文件大小."""
+        if size_bytes == 0:
+            return "0 B"
+        
+        size_names = ["B", "KB", "MB", "GB", "TB"]
+        import math
+        i = int(math.floor(math.log(size_bytes, 1024)))
+        p = math.pow(1024, i)
+        s = round(size_bytes / p, 2)
+        return f"{s} {size_names[i]}"
     
     async def test_connection(self) -> bool:
         """测试Bot连接."""

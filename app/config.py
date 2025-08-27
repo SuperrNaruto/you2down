@@ -1,8 +1,9 @@
 """配置管理模块."""
 
-from typing import List, Dict
+from typing import List, Dict, Optional, Any
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+import json
 
 
 class Settings(BaseSettings):
@@ -97,6 +98,81 @@ class Settings(BaseSettings):
     instagram_proxy_host: str = Field("", description="Instagram代理服务器地址")
     instagram_proxy_port: int = Field(0, description="Instagram代理服务器端口")
     instagram_custom_user_agent: str = Field("", description="Instagram自定义用户代理字符串")
+    instagram_request_delay: float = Field(2.0, description="Instagram请求间隔延迟(秒)")
+    instagram_rate_limit_window: int = Field(300, description="Instagram频率限制窗口时间(秒)")
+    
+    # Instagram高级反检测配置
+    instagram_enable_ip_rotation: bool = Field(False, description="启用Instagram IP轮换功能")
+    instagram_proxy_list_json: str = Field("", description="Instagram代理服务器列表(JSON格式)")
+    instagram_multi_account_json: str = Field("", description="Instagram多账号配置(JSON格式)")
+    instagram_session_rotation: bool = Field(False, description="启用Instagram会话轮换")
+    instagram_advanced_headers: bool = Field(True, description="启用Instagram高级请求头伪装")
+    def get_instagram_proxy_list(self) -> List[Dict[str, Any]]:
+        """获取Instagram代理服务器列表."""
+        if not self.instagram_proxy_list_json:
+            return []
+        
+        try:
+            proxy_list = json.loads(self.instagram_proxy_list_json)
+            # 验证格式
+            if isinstance(proxy_list, list):
+                validated_proxies = []
+                for proxy in proxy_list:
+                    if isinstance(proxy, dict) and 'host' in proxy and 'port' in proxy:
+                        validated_proxies.append({
+                            'host': proxy['host'],
+                            'port': int(proxy['port']),
+                            'type': proxy.get('type', 'http'),
+                            'username': proxy.get('username', ''),
+                            'password': proxy.get('password', ''),
+                            'name': proxy.get('name', f"{proxy['host']}:{proxy['port']}")
+                        })
+                return validated_proxies
+        except (json.JSONDecodeError, ValueError, KeyError) as e:
+            print(f"警告: 解析Instagram代理列表失败: {e}")
+        
+        return []
+    
+    def get_instagram_accounts(self) -> List[Dict[str, str]]:
+        """获取Instagram多账号配置."""
+        if not self.instagram_multi_account_json:
+            # 返回默认账号
+            if self.instagram_username and self.instagram_password:
+                return [{
+                    'username': self.instagram_username,
+                    'password': self.instagram_password,
+                    'name': 'primary',
+                    'session_file': self.instagram_session_file
+                }]
+            return []
+        
+        try:
+            accounts = json.loads(self.instagram_multi_account_json)
+            if isinstance(accounts, list):
+                validated_accounts = []
+                for i, account in enumerate(accounts):
+                    if isinstance(account, dict) and 'username' in account and 'password' in account:
+                        validated_accounts.append({
+                            'username': account['username'],
+                            'password': account['password'],
+                            'name': account.get('name', f'account_{i+1}'),
+                            'session_file': account.get('session_file', f"{self.instagram_session_file}.{i+1}")
+                        })
+                return validated_accounts
+        except (json.JSONDecodeError, ValueError, KeyError) as e:
+            print(f"警告: 解析Instagram多账号配置失败: {e}")
+        
+        # 返回默认账号作为备选
+        if self.instagram_username and self.instagram_password:
+            return [{
+                'username': self.instagram_username,
+                'password': self.instagram_password,
+                'name': 'primary',
+                'session_file': self.instagram_session_file
+            }]
+        
+        return []
+    
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
