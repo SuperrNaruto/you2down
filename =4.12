@@ -1,9 +1,0 @@
-Collecting instaloader
-  Downloading instaloader-4.14.2-py3-none-any.whl (67 kB)
-Requirement already satisfied: requests>=2.25 in /usr/local/lib/python3.9/dist-packages (from instaloader) (2.32.5)
-Requirement already satisfied: urllib3<3,>=1.21.1 in /usr/local/lib/python3.9/dist-packages (from requests>=2.25->instaloader) (2.5.0)
-Requirement already satisfied: idna<4,>=2.5 in /usr/lib/python3/dist-packages (from requests>=2.25->instaloader) (2.10)
-Requirement already satisfied: certifi>=2017.4.17 in /usr/local/lib/python3.9/dist-packages (from requests>=2.25->instaloader) (2025.8.3)
-Requirement already satisfied: charset_normalizer<4,>=2 in /usr/local/lib/python3.9/dist-packages (from requests>=2.25->instaloader) (3.4.3)
-Installing collected packages: instaloader
-Successfully installed instaloader-4.14.2

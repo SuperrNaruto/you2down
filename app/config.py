@@ -85,93 +85,22 @@ class Settings(BaseSettings):
     instagram_username: str = Field("", description="Instagram用户名")
     instagram_password: str = Field("", description="Instagram密码")
     instagram_session_file: str = Field("/app/data/instagram_session.json", description="Instagram会话文件路径")
+    instagram_cookie_file: str = Field("/app/data/instagram_cookies.json", description="Instagram Cookie文件路径")
     instagram_download_path: str = Field("/app/downloads/instagram", description="Instagram下载目录")
     instagram_check_interval: int = Field(3600, description="Instagram收藏检查间隔(秒)，默认1小时")
     max_instagram_concurrent: int = Field(2, description="Instagram最大并发下载数")
     instagram_upload_to_alist: bool = Field(True, description="将下载的Instagram视频上传到Alist")
     instagram_quality: str = Field("best", description="Instagram视频质量: best, 720p, 480p")
     
-    # Instagram重试和代理配置
+    # Instagram简化配置
     instagram_max_retries: int = Field(5, description="Instagram API最大重试次数")
     instagram_retry_delay: int = Field(60, description="Instagram重试延迟基数(秒)")
-    instagram_use_proxy: bool = Field(False, description="Instagram是否使用代理")
-    instagram_proxy_host: str = Field("", description="Instagram代理服务器地址")
-    instagram_proxy_port: int = Field(0, description="Instagram代理服务器端口")
     instagram_custom_user_agent: str = Field("", description="Instagram自定义用户代理字符串")
     instagram_request_delay: float = Field(2.0, description="Instagram请求间隔延迟(秒)")
     instagram_rate_limit_window: int = Field(300, description="Instagram频率限制窗口时间(秒)")
+    # 移除复杂的代理配置方法
     
-    # Instagram高级反检测配置
-    instagram_enable_ip_rotation: bool = Field(False, description="启用Instagram IP轮换功能")
-    instagram_proxy_list_json: str = Field("", description="Instagram代理服务器列表(JSON格式)")
-    instagram_multi_account_json: str = Field("", description="Instagram多账号配置(JSON格式)")
-    instagram_session_rotation: bool = Field(False, description="启用Instagram会话轮换")
-    instagram_advanced_headers: bool = Field(True, description="启用Instagram高级请求头伪装")
-    def get_instagram_proxy_list(self) -> List[Dict[str, Any]]:
-        """获取Instagram代理服务器列表."""
-        if not self.instagram_proxy_list_json:
-            return []
-        
-        try:
-            proxy_list = json.loads(self.instagram_proxy_list_json)
-            # 验证格式
-            if isinstance(proxy_list, list):
-                validated_proxies = []
-                for proxy in proxy_list:
-                    if isinstance(proxy, dict) and 'host' in proxy and 'port' in proxy:
-                        validated_proxies.append({
-                            'host': proxy['host'],
-                            'port': int(proxy['port']),
-                            'type': proxy.get('type', 'http'),
-                            'username': proxy.get('username', ''),
-                            'password': proxy.get('password', ''),
-                            'name': proxy.get('name', f"{proxy['host']}:{proxy['port']}")
-                        })
-                return validated_proxies
-        except (json.JSONDecodeError, ValueError, KeyError) as e:
-            print(f"警告: 解析Instagram代理列表失败: {e}")
-        
-        return []
-    
-    def get_instagram_accounts(self) -> List[Dict[str, str]]:
-        """获取Instagram多账号配置."""
-        if not self.instagram_multi_account_json:
-            # 返回默认账号
-            if self.instagram_username and self.instagram_password:
-                return [{
-                    'username': self.instagram_username,
-                    'password': self.instagram_password,
-                    'name': 'primary',
-                    'session_file': self.instagram_session_file
-                }]
-            return []
-        
-        try:
-            accounts = json.loads(self.instagram_multi_account_json)
-            if isinstance(accounts, list):
-                validated_accounts = []
-                for i, account in enumerate(accounts):
-                    if isinstance(account, dict) and 'username' in account and 'password' in account:
-                        validated_accounts.append({
-                            'username': account['username'],
-                            'password': account['password'],
-                            'name': account.get('name', f'account_{i+1}'),
-                            'session_file': account.get('session_file', f"{self.instagram_session_file}.{i+1}")
-                        })
-                return validated_accounts
-        except (json.JSONDecodeError, ValueError, KeyError) as e:
-            print(f"警告: 解析Instagram多账号配置失败: {e}")
-        
-        # 返回默认账号作为备选
-        if self.instagram_username and self.instagram_password:
-            return [{
-                'username': self.instagram_username,
-                'password': self.instagram_password,
-                'name': 'primary',
-                'session_file': self.instagram_session_file
-            }]
-        
-        return []
+    # 移除多账号配置方法，简化为单账号模式
     
     model_config = SettingsConfigDict(
         env_file=".env",
