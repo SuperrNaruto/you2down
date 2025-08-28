@@ -204,6 +204,40 @@ class VideoUploader:
             print(f"验证上传路径失败: {e}")
             return False
     
+    async def upload_file(self, local_path: str, remote_path: str) -> bool:
+        """通用文件上传方法.
+        
+        Args:
+            local_path: 本地文件路径
+            remote_path: 远程文件路径（包含文件名）
+        
+        Returns:
+            bool: 上传是否成功
+        """
+        try:
+            if not os.path.exists(local_path):
+                print(f"文件不存在: {local_path}")
+                return False
+            
+            # 提取目录路径（去掉文件名）
+            remote_dir = os.path.dirname(remote_path)
+            
+            print(f"开始上传文件: {local_path} -> {remote_path}")
+            
+            # 使用AlistClient上传文件
+            upload_result = await self.alist.upload_file(local_path, remote_dir)
+            
+            if upload_result.success:
+                print(f"文件上传成功: {remote_path}")
+                return True
+            else:
+                print(f"文件上传失败: {upload_result.error}")
+                return False
+                
+        except Exception as e:
+            print(f"上传文件时出错: {str(e)}")
+            return False
+    
     async def cleanup_failed_uploads(self) -> None:
         """清理上传失败的视频文件."""
         failed_videos = await self.db.get_videos_by_status("failed")

@@ -748,14 +748,14 @@ class TaskScheduler:
                 username=self.config.instagram_username,
                 password=self.config.instagram_password,
                 session_file=self.config.instagram_session_file,
+                cookie_file=self.config.instagram_cookie_file,
                 max_retries=self.config.instagram_max_retries,
                 retry_delay=self.config.instagram_retry_delay,
-                use_proxy=self.config.instagram_use_proxy,
-                proxy_host=self.config.instagram_proxy_host,
-                proxy_port=self.config.instagram_proxy_port,
-                custom_user_agent=self.config.instagram_custom_user_agent
+                custom_user_agent=self.config.instagram_custom_user_agent,
+                request_delay=self.config.instagram_request_delay,
+                rate_limit_window=self.config.instagram_rate_limit_window
             )
-            await self.instagram_client.init()
+            await self.instagram_client.initialize()
             
             # 初始化Instagram下载器
             self.instagram_downloader = InstagramDownloader(
@@ -771,7 +771,8 @@ class TaskScheduler:
                 error_callback=self._instagram_error_callback
             )
             
-            print("Instagram组件初始化完成")
+            # 显示初始化信息
+            print(f"Instagram组件初始化完成 - 用户: {self.config.instagram_username}")
             
         except Exception as e:
             print(f"Instagram组件初始化失败: {e}")

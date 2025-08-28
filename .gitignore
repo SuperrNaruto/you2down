@@ -72,10 +72,16 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 
-# Testing files
+# Testing and debug files
 test_*.py
-check_db.py
-simple_test.py
+debug_*.py
+fix_*.py
+check_*.py
+simple_*.py
+simulate_*.py
+manual_*.py
+force_*.py
+cleanup_*.py
 
 # Temporary files
 *.tmp

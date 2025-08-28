@@ -1,8 +1,9 @@
 """配置管理模块."""
 
-from typing import List, Dict
+from typing import List, Dict, Optional, Any
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+import json
 
 
 class Settings(BaseSettings):
@@ -84,19 +85,23 @@ class Settings(BaseSettings):
     instagram_username: str = Field("", description="Instagram用户名")
     instagram_password: str = Field("", description="Instagram密码")
     instagram_session_file: str = Field("/app/data/instagram_session.json", description="Instagram会话文件路径")
+    instagram_cookie_file: str = Field("/app/data/instagram_cookies.json", description="Instagram Cookie文件路径")
     instagram_download_path: str = Field("/app/downloads/instagram", description="Instagram下载目录")
     instagram_check_interval: int = Field(3600, description="Instagram收藏检查间隔(秒)，默认1小时")
     max_instagram_concurrent: int = Field(2, description="Instagram最大并发下载数")
     instagram_upload_to_alist: bool = Field(True, description="将下载的Instagram视频上传到Alist")
     instagram_quality: str = Field("best", description="Instagram视频质量: best, 720p, 480p")
     
-    # Instagram重试和代理配置
+    # Instagram简化配置
     instagram_max_retries: int = Field(5, description="Instagram API最大重试次数")
     instagram_retry_delay: int = Field(60, description="Instagram重试延迟基数(秒)")
-    instagram_use_proxy: bool = Field(False, description="Instagram是否使用代理")
-    instagram_proxy_host: str = Field("", description="Instagram代理服务器地址")
-    instagram_proxy_port: int = Field(0, description="Instagram代理服务器端口")
     instagram_custom_user_agent: str = Field("", description="Instagram自定义用户代理字符串")
+    instagram_request_delay: float = Field(2.0, description="Instagram请求间隔延迟(秒)")
+    instagram_rate_limit_window: int = Field(300, description="Instagram频率限制窗口时间(秒)")
+    # 移除复杂的代理配置方法
+    
+    # 移除多账号配置方法，简化为单账号模式
+    
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

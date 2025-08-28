@@ -152,7 +152,8 @@ class YouTubeClient:
                     title=yt_video.title,
                     url=yt_video.url,
                     playlist_id=playlist_id,
-                    status="pending"
+                    status="pending",
+                    description=yt_video.description  # 添加视频描述用于Drive链接检测
                 )
                 new_videos.append(video_info)
             
